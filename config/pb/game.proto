@@ -1,0 +1,13 @@
+syntax = "proto3";
+package pb;
+
+message LoginReq {
+    string username = 1;
+    string password = 2;
+}
+
+message LoginRes {
+    uint32 player_id = 1;
+    string nickname = 2;
+    uint32 level = 3;
+}
