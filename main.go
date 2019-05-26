@@ -11,6 +11,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "GoGameExample"
+	app.Description = "Golang Game Example"
 	app.Version = "1.0.0"
 	app.Commands = []cli.Command{
 		cmd.Server,

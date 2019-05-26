@@ -24,5 +24,9 @@ func Load() error {
 
 	Cfg.NameMapper = ini.AllCapsUnderscore
 
+	// server
+	Server.Host = Cfg.Section("server").Key("Host").MustString("127.0.0.1")
+	Server.Port = Cfg.Section("server").Key("Port").MustString("8000")
+
 	return nil
 }
