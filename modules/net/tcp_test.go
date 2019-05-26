@@ -1,10 +1,9 @@
 package net
 
 import (
-	"fmt"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"net"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,141 +14,92 @@ var serverAddr = "127.0.0.1:8000"
 func TestServer(t *testing.T) {
 	waiter := &sync.WaitGroup{}
 
-	s, err := runServer(waiter)
-	if err != nil {
-		t.Errorf("runServer with err: %v", err)
-	}
+	server := runServer(t, waiter)
 
 	time.Sleep(10 * time.Millisecond)
 
-	conn1, err := runClientAndWrite(1000, "client1")
-	if err != nil {
-		t.Errorf("runClient with err: %v", err)
-	}
+	conn1 := runClientAndWrite(t, 1000, "client1")
 
 	time.Sleep(10 * time.Millisecond)
 
-	conn2, err := runClientAndWrite(2000, "client2")
-	if err != nil {
-		t.Errorf("runClient with err: %v", err)
-	}
+	conn2 := runClientAndWrite(t, 2000, "client2")
 
 	time.Sleep(10 * time.Millisecond)
 
-	if len(s.Incoming()) != 2 {
-		t.Errorf("Server incoming length want 2, got %v", len(s.Incoming()))
-	}
+	assert.Equal(t, 2, len(server.Incoming()), "Server incoming packet num")
 
-	packet1 := <-s.Incoming()
-	if err := assertServerPacket(packet1, 1000, "client1", conn1.LocalAddr().String()); err != nil {
-		t.Error(err)
-	}
+	packet1 := <-server.Incoming()
+	assertServerPacket(t, packet1, 1000, "client1", conn1.LocalAddr().String())
 
-	packet2 := <-s.Incoming()
-	if err := assertServerPacket(packet2, 2000, "client2", conn2.LocalAddr().String()); err != nil {
-		t.Error(err)
-	}
+	packet2 := <-server.Incoming()
+	assertServerPacket(t, packet2, 2000, "client2", conn2.LocalAddr().String())
 
-	if err := assertClientPacket(conn1, 1001, "client1"); err != nil {
-		t.Error(err)
-	}
+	assertClientPacket(t, conn1, 1001, "client1")
 
-	if err := assertClientPacket(conn2, 2001, "client2"); err != nil {
-		t.Error(err)
-	}
+	assertClientPacket(t, conn2, 2001, "client2")
 
-	if err := conn1.Close(); err != nil {
-		t.Errorf("Conn1 Close with err: %v", err)
-	}
+	assert.Nil(t, conn1.Close(), "Conn1.Close")
 
-	if err := conn2.Close(); err != nil {
-		t.Errorf("Conn2 Close with err: %v", err)
-	}
+	assert.Nil(t, conn2.Close(), "Conn2.Close")
 
 	time.Sleep(10 * time.Millisecond)
 
-	if err := s.Close(); err != nil {
-		t.Errorf("Server Close with err: %v", err)
-	}
+	assert.Nil(t, server.Close(), "Server.Close")
 
 	waiter.Wait()
 }
 
-func assertServerPacket(packet *Packet, command uint32, msg string, connAddr string) error {
+func assertServerPacket(t *testing.T, packet *Packet, command uint32, msg string, connAddr string) {
 	sessionAddr := packet.Session().Conn().RemoteAddr().String()
 
-	if packet.Command != command {
-		return fmt.Errorf("Incoming packet.Command: want 1000, got %v", packet.Command)
-	}
+	assert.Equal(t, command, packet.Command, "Incoming packet.Command")
 
-	body := string(packet.Body)
-	if !strings.EqualFold(body, msg) {
-		return fmt.Errorf("Incoming packet.Body: want hello, got %s", packet.Body)
-	}
+	assert.Equal(t, msg, string(packet.Body), "Incoming packet.Body")
 
-	if sessionAddr != connAddr {
-		return fmt.Errorf("Incoming packet.session: want %v, got %s", connAddr, sessionAddr)
-	}
+	assert.Equal(t, connAddr, sessionAddr, "Incoming packet.session")
 
 	logrus.Infof("Recv: command=%v, body=%s from %v", packet.Command, packet.Body, sessionAddr)
 
 	replyPacket := &Packet{}
 	replyPacket.Command = command + 1
-	replyPacket.Body = []byte(body)
+	replyPacket.Body = []byte(msg)
 
-	if err := packet.Session().Send(replyPacket); err != nil {
-		return fmt.Errorf("Session Send with err: %v", err)
-	}
+	assert.Nil(t, packet.Session().Send(replyPacket), "Session.Send")
 
 	logrus.Infof("Reply: command=%v, body=%s to %v", replyPacket.Command, replyPacket.Body, sessionAddr)
-
-	return nil
 }
 
-func assertClientPacket(conn net.Conn, command uint32, msg string) error {
+func assertClientPacket(t *testing.T, conn net.Conn, command uint32, msg string) {
 	packet := &Packet{}
-	if err := packet.read(conn); err != nil {
-		return fmt.Errorf("Client read with err: %v", err)
-	}
 
-	if packet.Command != command {
-		return fmt.Errorf("Client packet.Command: want %v, got %v", command, packet.Command)
-	}
+	assert.Nil(t, packet.read(conn), "Client read")
 
-	if !strings.EqualFold(string(packet.Body), msg) {
-		return fmt.Errorf("Client packet.Body: want %s, got %s", msg, packet.Body)
-	}
+	assert.Equal(t, command, packet.Command, "Packet.Command")
+
+	assert.Equal(t, msg, string(packet.Body), "Packet.Body")
 
 	logrus.Infof("Recv Reply: command=%v, body=%s from %v", packet.Command, packet.Body, conn.RemoteAddr())
-
-	return nil
 }
 
-func runServer(waiter *sync.WaitGroup) (*Server, error) {
+func runServer(t *testing.T, waiter *sync.WaitGroup) *Server {
 	s := NewServer(serverAddr)
 
-	if err := s.Run(waiter); err != nil {
-		return nil, err
-	}
+	assert.Nil(t, s.Run(waiter), "Server.Run")
 
-	return s, nil
+	return s
 }
 
-func runClientAndWrite(command uint32, msg string) (net.Conn, error) {
+func runClientAndWrite(t *testing.T, command uint32, msg string) net.Conn {
 	conn, err := net.Dial("tcp", serverAddr)
-	if err != nil {
-		return nil, err
-	}
+	assert.Nil(t, err, "Dial Server")
 
 	packet := &Packet{}
 	packet.Command = command
 	packet.Body = []byte(msg)
 
-	if err := packet.write(conn); err != nil {
-		return nil, err
-	}
+	assert.Nil(t, packet.write(conn), "Packet.write")
 
 	logrus.Infof("%v Send: command=%v, body=%s", conn.LocalAddr(), packet.Command, packet.Body)
 
-	return conn, nil
+	return conn
 }

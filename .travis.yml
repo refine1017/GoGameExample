@@ -1,0 +1,9 @@
+language: go
+
+go:
+  - "1.10"
+  - master
+
+script:
+  - go test -v
+  - go test -v -cover -covermode=count -coverprofile=profile.cov
