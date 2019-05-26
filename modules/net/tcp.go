@@ -20,8 +20,8 @@ func NewServer(addr string) *Server {
 	s := &Server{}
 	s.addr = addr
 	s.sessions = make(map[net.Addr]*Session)
-	s.incoming = make(chan *Packet)
-	s.outgoing = make(chan *Packet)
+	s.incoming = make(chan *Packet, 1000)
+	s.outgoing = make(chan *Packet, 1000)
 
 	return s
 }
@@ -37,19 +37,23 @@ func (s *Server) Run(waiter *sync.WaitGroup) error {
 	s.waiter = waiter
 	waiter.Add(1)
 
-	go s.Accept()
+	go s.accept()
 
 	return nil
 }
 
-func (s *Server) Accept() {
+func (s *Server) Incoming() chan *Packet {
+	return s.incoming
+}
+
+func (s *Server) accept() {
 	defer s.waiter.Done()
 
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
-				logrus.Error("Server.Accept:", ne.Error(), "[temporary]")
+				logrus.Error("Server.accept:", ne.Error(), "[temporary]")
 				time.Sleep(time.Millisecond)
 				continue
 			}
@@ -60,6 +64,6 @@ func (s *Server) Accept() {
 		s.sessions[conn.RemoteAddr()] = session
 		session.Go()
 
-		logrus.Infof("Accept new session: %v", conn.RemoteAddr())
+		logrus.Infof("accept new session: %v", conn.RemoteAddr())
 	}
 }
