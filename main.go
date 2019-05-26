@@ -3,8 +3,8 @@ package main
 import (
 	"github.com/refine1017/GoGameExample/cmd"
 	"github.com/refine1017/GoGameExample/modules/setting"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"log"
 	"os"
 )
 
@@ -33,6 +33,6 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Fatal("Failed to run app with %s: %v", os.Args, err)
+		logrus.Fatalf("Failed to run app with %s: %v", os.Args, err)
 	}
 }
