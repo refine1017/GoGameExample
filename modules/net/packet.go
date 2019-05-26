@@ -3,9 +3,11 @@ package net
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/sirupsen/logrus"
+	"fmt"
 	"net"
 )
+
+const HeaderSize = 8
 
 type Packet struct {
 	session *Session
@@ -19,16 +21,14 @@ func (p *Packet) Session() *Session {
 }
 
 func (p *Packet) readHeader(conn net.Conn) error {
-	header := make([]byte, 8)
+	header := make([]byte, HeaderSize)
 	headerLen, err := conn.Read(header)
 	if err != nil {
-		logrus.Errorf("Conn Read header with err: %v", err)
 		return err
 	}
 
-	if headerLen != 8 {
-		logrus.Errorf("Conn Read header size != 8, len = %v", headerLen)
-		return errors.New("Read header size error")
+	if headerLen != HeaderSize {
+		return fmt.Errorf("header size != %v, len = %v", HeaderSize, headerLen)
 	}
 
 	p.Length = binary.LittleEndian.Uint32(header[0:4])
@@ -53,13 +53,11 @@ func (p *Packet) readBody(conn net.Conn) error {
 	body := make([]byte, p.Length)
 	bodyLen, err := conn.Read(body)
 	if err != nil {
-		logrus.Errorf("Conn Read body with err: %v", err)
 		return err
 	}
 
 	if bodyLen != int(p.Length) {
-		logrus.Errorf("Conn Read body size != %v, len = %v", p.Length, bodyLen)
-		return errors.New("Read body size error")
+		return fmt.Errorf("body size != %v, len = %v", p.Length, bodyLen)
 	}
 
 	p.Body = body
@@ -93,7 +91,7 @@ func (p *Packet) writeHeader(conn net.Conn) error {
 	}
 
 	if n != 8 {
-		return errors.New("Write header size error")
+		return errors.New("write header size error")
 	}
 
 	return nil
@@ -106,7 +104,7 @@ func (p *Packet) writeBody(conn net.Conn) error {
 	}
 
 	if n != int(p.Length) {
-		return errors.New("Write body size error")
+		return errors.New("write body size error")
 	}
 
 	return nil
