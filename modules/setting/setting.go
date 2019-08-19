@@ -1,7 +1,7 @@
 package setting
 
 import (
-	"github.com/Unknwon/com"
+	"github.com/unknwon/com"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/ini.v1"
 )
